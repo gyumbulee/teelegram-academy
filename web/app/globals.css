@@ -1,0 +1,496 @@
+:root {
+  --ink: #15181b;
+  --ink-soft: #1e2225;
+  --paper: #f2ecdd;
+  --paper-line: #d9cfb4;
+  --amber: #d4832f;
+  --moss: #6c7a56;
+  --ash: #8b8b80;
+  --text-on-ink: #ece7d8;
+  --text-on-paper: #15181b;
+
+  --font-display: "Fraunces", serif;
+  --font-body: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background: var(--ink);
+  color: var(--text-on-ink);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Header */
+
+.site-header {
+  padding: 32px 0 0;
+}
+
+.wordmark {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: var(--ash);
+  text-decoration: none;
+}
+
+/* Hero */
+
+.hero {
+  padding: 64px 0 72px;
+  border-bottom: 1px solid rgba(236, 231, 216, 0.12);
+}
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  line-height: 1.12;
+  margin: 0 0 20px;
+  max-width: 14ch;
+}
+
+.hero h1 em {
+  font-style: italic;
+  color: var(--amber);
+}
+
+.hero p {
+  max-width: 46ch;
+  color: var(--text-on-ink);
+  opacity: 0.82;
+  font-size: 1.05rem;
+  margin: 0 0 28px;
+}
+
+.hero-note {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--ash);
+}
+
+/* Section headings */
+
+.section {
+  padding: 56px 0;
+  border-bottom: 1px solid rgba(236, 231, 216, 0.12);
+}
+
+.section:last-of-type {
+  border-bottom: none;
+}
+
+.section h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.5rem;
+  margin: 0 0 8px;
+}
+
+.section-lead {
+  color: var(--ash);
+  font-size: 0.95rem;
+  margin: 0 0 32px;
+  max-width: 52ch;
+}
+
+/* Course index cards */
+
+.course-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.course-card {
+  background: var(--paper);
+  color: var(--text-on-paper);
+  border-radius: 3px;
+  padding: 22px 24px;
+  position: relative;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+.course-card:nth-child(even) {
+  transform: rotate(-0.3deg);
+}
+
+.course-card:nth-child(odd) {
+  transform: rotate(0.25deg);
+}
+
+.course-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  padding: 3px 8px;
+  border: 1px solid var(--paper-line);
+  border-radius: 2px;
+  color: var(--moss);
+  margin-bottom: 10px;
+}
+
+.course-tag.one-on-one {
+  color: var(--amber);
+}
+
+.course-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+
+.course-card p {
+  margin: 0 0 16px;
+  font-size: 0.92rem;
+  color: #47453d;
+  max-width: 56ch;
+}
+
+.course-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-top: 1px dashed var(--paper-line);
+  padding-top: 14px;
+}
+
+.course-price {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+
+.course-price .duration {
+  color: var(--ash);
+  font-size: 0.8rem;
+  display: block;
+  margin-top: 2px;
+}
+
+.course-cta {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  background: var(--ink);
+  color: var(--text-on-ink);
+  border: none;
+  padding: 10px 16px;
+  border-radius: 2px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.course-cta:hover {
+  background: var(--ink-soft);
+}
+
+.empty-note {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ash);
+}
+
+/* How it works */
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.step {
+  display: flex;
+  gap: 16px;
+}
+
+.step-index {
+  font-family: var(--font-mono);
+  color: var(--amber);
+  font-size: 0.85rem;
+  padding-top: 2px;
+}
+
+.step p {
+  margin: 0;
+  color: var(--text-on-ink);
+  opacity: 0.85;
+  max-width: 50ch;
+}
+
+.step strong {
+  display: block;
+  font-family: var(--font-body);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+/* Footer */
+
+.site-footer {
+  padding: 32px 0 56px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ash);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .course-card {
+    transform: none !important;
+  }
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- */
+/* Admin dashboard — functional, table-driven, same type system as   */
+/* the landing page but no decorative flourishes; this is a work tool. */
+/* ---------------------------------------------------------------- */
+
+.admin {
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--text-on-paper);
+}
+
+.admin-header {
+  border-bottom: 1px solid var(--paper-line);
+  padding: 20px 0;
+}
+
+.admin-header .wrap {
+  max-width: 960px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-header h1 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.admin-header nav a {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  text-decoration: none;
+  color: var(--text-on-paper);
+  opacity: 0.7;
+}
+
+.admin-header nav a:hover {
+  opacity: 1;
+}
+
+.admin-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.admin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.admin-toolbar h2 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.btn {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  background: var(--ink);
+  color: var(--text-on-ink);
+  border: none;
+  padding: 9px 14px;
+  border-radius: 2px;
+  text-decoration: none;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--ink-soft);
+}
+
+.btn-quiet {
+  background: transparent;
+  color: var(--text-on-paper);
+  border: 1px solid var(--paper-line);
+}
+
+.btn-quiet:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.admin-table th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ash);
+  font-weight: 500;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--paper-line);
+}
+
+.admin-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--paper-line);
+  vertical-align: middle;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table td.num,
+.admin-table th.num {
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.status-pill {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 2px;
+  border: 1px solid var(--paper-line);
+}
+
+.status-pill.active {
+  color: var(--moss);
+  border-color: var(--moss);
+}
+
+.status-pill.draft {
+  color: var(--ash);
+}
+
+.admin-form {
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
+.admin-form label span {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--ash);
+}
+
+.admin-form input,
+.admin-form textarea,
+.admin-form select {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  padding: 9px 10px;
+  border: 1px solid var(--paper-line);
+  border-radius: 2px;
+  background: #fff;
+  color: var(--text-on-paper);
+}
+
+.admin-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.admin-form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.admin-form-row label {
+  flex: 1;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.lesson-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--paper-line);
+  font-size: 0.9rem;
+}
+
+.lesson-row:last-child {
+  border-bottom: none;
+}
+
+.lesson-order {
+  font-family: var(--font-mono);
+  color: var(--ash);
+  margin-right: 10px;
+}
+
+.admin-empty {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ash);
+  padding: 24px 0;
+}
+
+.admin-back {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--ash);
+  text-decoration: none;
+  display: inline-block;
+  margin-bottom: 16px;
+}
