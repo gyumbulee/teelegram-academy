@@ -145,7 +145,6 @@ export async function handleResendInvite(ctx: Context) {
   await updateInviteLink(access.channel_access_id, inviteLink.invite_link);
 
   await ctx.reply(
-    `Here's a fresh invite link for *${course.title}* (valid until ${formatExpiry(access.expires_at)}):\n${inviteLink.invite_link}`,
-    { parse_mode: "Markdown" },
+    `Here's a fresh invite link for ${course.title} (valid until ${formatExpiry(access.expires_at)}):\n${inviteLink.invite_link}`,
   );
 }

@@ -44,6 +44,7 @@ export async function fulfillPaidOrder(order: OrderForFulfillment): Promise<void
 
   await sendTelegramMessage(
     order.telegram_id,
-    `✅ Payment received for *${order.title}*!\n\nJoin here (one-time link, valid for one use):\n${inviteLink}\n\nYour access runs for ${order.access_duration_days} days.`,
+    `✅ Payment received for ${order.title}!\n\nJoin here (one-time link, valid for one use):\n${inviteLink}\n\nYour access runs for ${order.access_duration_days} days.`,
+    false,
   );
 }

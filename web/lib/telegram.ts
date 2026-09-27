@@ -31,14 +31,39 @@ export async function createOneTimeInviteLink(
   return result.invite_link;
 }
 
+// useMarkdown defaults to true, but should be false for any text
+// containing a raw URL — invite links frequently contain underscores,
+// which Telegram's legacy Markdown parser reads as italic markers and
+// then fails with "can't parse entities" if they're unmatched.
 export async function sendTelegramMessage(
   telegramUserId: number,
   text: string,
+  useMarkdown: boolean = true,
+): Promise<void> {
+  await telegramFetch("sendMessage", {
+    chat_id: telegramUserId,
+    text,
+    ...(useMarkdown ? { parse_mode: "Markdown" } : {}),
+  });
+}
+
+// Same as above, but with a button that re-triggers the bot's existing
+// buy_course_<id> callback — handled by the bot process via long polling
+// regardless of which process (web or bot) sent the message, since
+// Telegram delivers the tap to whichever process is polling for updates.
+export async function sendTelegramMessageWithCourseButton(
+  telegramUserId: number,
+  text: string,
+  courseId: number,
+  buttonLabel: string,
 ): Promise<void> {
   await telegramFetch("sendMessage", {
     chat_id: telegramUserId,
     text,
     parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [[{ text: buttonLabel, callback_data: `buy_course_${courseId}` }]],
+    },
   });
 }
 
