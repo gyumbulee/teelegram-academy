@@ -38,6 +38,35 @@ export async function findOrderByReference(
   return rows[0] ?? null;
 }
 
+// Fallback matcher for providers (Korapay) where the webhook payload's
+// exact reference field is less certain than Flutterwave's tx_ref —
+// matches on the account number itself instead, which we always store.
+export async function findOrderByAccountNumber(
+  accountNumber: string,
+): Promise<OrderForFulfillment | null> {
+  const { rows } = await pool.query<OrderForFulfillment>(
+    `SELECT
+       o.id AS order_id,
+       o.status AS order_status,
+       u.id AS user_id,
+       u.telegram_id,
+       c.id AS course_id,
+       c.type AS course_type,
+       c.telegram_channel_id,
+       c.access_duration_days,
+       c.title
+     FROM virtual_accounts va
+     JOIN orders o ON o.id = va.order_id
+     JOIN users u ON u.id = o.user_id
+     JOIN courses c ON c.id = o.course_id
+     WHERE va.account_number = $1
+     ORDER BY o.created_at DESC
+     LIMIT 1`,
+    [accountNumber],
+  );
+  return rows[0] ?? null;
+}
+
 export async function markOrderPaid(orderId: number): Promise<void> {
   await pool.query(
     `UPDATE orders SET status = 'paid', paid_at = now() WHERE id = $1`,
@@ -70,4 +99,30 @@ export async function createPendingBooking(params: {
      VALUES ($1, $2, $3, 'pending')`,
     [params.userId, params.courseId, params.orderId],
   );
+}
+
+export interface StalePendingOrder {
+  order_id: number;
+  telegram_id: number;
+  course_id: number;
+  title: string;
+}
+
+// Orders past their virtual account's ~1hr window that never got paid.
+// 65 minutes gives a small buffer past Flutterwave's own account expiry
+// so we don't race a payment that's still mid-flight.
+export async function findStalePendingOrders(): Promise<StalePendingOrder[]> {
+  const { rows } = await pool.query<StalePendingOrder>(
+    `SELECT o.id AS order_id, u.telegram_id, c.id AS course_id, c.title
+     FROM orders o
+     JOIN users u ON u.id = o.user_id
+     JOIN courses c ON c.id = o.course_id
+     WHERE o.status = 'pending'
+       AND o.created_at < now() - interval '65 minutes'`,
+  );
+  return rows;
+}
+
+export async function markOrderExpired(orderId: number): Promise<void> {
+  await pool.query(`UPDATE orders SET status = 'expired' WHERE id = $1`, [orderId]);
 }

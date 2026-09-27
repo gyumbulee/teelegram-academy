@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyFlutterwaveSignature } from "@/lib/verifyFlutterwaveSignature";
-import { findOrderByReference, markOrderPaid, grantChannelAccess, createPendingBooking } from "@/lib/orders";
-import { createOneTimeInviteLink, sendTelegramMessage } from "@/lib/telegram";
+import { findOrderByReference } from "@/lib/orders";
+import { fulfillPaidOrder } from "@/lib/fulfillOrder";
 
 // Flutterwave sends a "charge.completed" event for virtual-account funding
 // too (a bank transfer into the dedicated account is treated as a charge).
@@ -36,39 +36,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  await markOrderPaid(order.order_id);
-
-  if (order.course_type === "one_on_one") {
-    await createPendingBooking({
-      userId: order.user_id,
-      courseId: order.course_id,
-      orderId: order.order_id,
-    });
-    await sendTelegramMessage(
-      order.telegram_id,
-      `✅ Payment received for *${order.title}*! We'll follow up here shortly to schedule your session.`,
-    );
-  } else {
-    if (!order.telegram_channel_id) {
-      console.error(`Course ${order.course_id} has no telegram_channel_id set`);
-      return NextResponse.json({ received: true });
-    }
-
-    const inviteLink = await createOneTimeInviteLink(order.telegram_channel_id);
-
-    await grantChannelAccess({
-      userId: order.user_id,
-      courseId: order.course_id,
-      orderId: order.order_id,
-      inviteLink,
-      durationDays: order.access_duration_days,
-    });
-
-    await sendTelegramMessage(
-      order.telegram_id,
-      `✅ Payment received for *${order.title}*!\n\nJoin here (one-time link, valid for one use):\n${inviteLink}\n\nYour access runs for ${order.access_duration_days} days.`,
-    );
-  }
+  await fulfillPaidOrder(order);
 
   return NextResponse.json({ received: true });
 }

@@ -104,6 +104,20 @@ a Secret Hash under the same webhook settings — that value goes in
    Set `BOT_USERNAME` in `web/.env` to your bot's username, without the
    `@` (e.g. `TelegramAcademyBot`).
 
+6. **Unpaid-order expiry cron** — `app/api/cron/expire-orders/route.ts`.
+   Separate from the daily channel-access sweep: orders left `pending` for
+   more than 65 minutes (past Flutterwave's ~1hr virtual account window)
+   get marked `expired`, and the user gets a message + a one-tap "Start a
+   new order" button for the same course. Run this one every 10-15
+   minutes (not once daily — a stale order going unnoticed for a full day
+   would be a poor experience), same `CRON_SECRET` bearer auth as the
+   other cron route:
+
+   ```
+   */15 * * * * curl -s -X POST https://<your-subdomain>/api/cron/expire-orders \
+     -H "Authorization: Bearer <your CRON_SECRET>"
+   ```
+
 Still to build: none — Phase 1 and the admin dashboard are both in place.
 Phase 3 (custom 1-on-1 scheduling) is next when subscribers start asking for it.
 
@@ -121,6 +135,37 @@ Phase 3 (custom 1-on-1 scheduling) is next when subscribers start asking for it.
 
    Visit `http://localhost:3000/admin` — your browser will prompt for the
    username/password.
+
+## Payment providers
+
+Which provider is active is a single switch: `PAYMENT_PROVIDER` in
+`bot/.env` (`flutterwave` or `korapay`, defaults to `flutterwave` if unset).
+Everything else in the bot calls `services/payment.ts`, which dispatches
+to whichever one is active — no other code needs to change to switch.
+
+- **Flutterwave** (`services/flutterwave.ts`) — dynamic virtual accounts,
+  locked to both an exact amount and a ~1hr expiry window. We hit
+  persistent "Invalid amount" rejections in live mode traced back to a
+  pending compliance/verification item on the account (not a code issue) —
+  worth confirming that's fully cleared before relying on this provider
+  again.
+- **Korapay** (`services/korapay.ts`) — virtual bank accounts with no
+  amount-locking at all (no `amount` field in their creation API), so this
+  whole failure mode doesn't apply. Requires `KORAPAY_SECRET_KEY` in both
+  `bot/.env` and `web/.env`, plus `KORAPAY_BANK_CODE` (`035` = Wema, live;
+  use `000` for Korapay's own sandbox).
+
+**Korapay webhook caveat:** `app/api/webhooks/korapay/route.ts` matches an
+incoming payment back to an order by trying `data.account_reference` first,
+falling back to matching on the account number — the exact field Korapay
+uses in a real webhook payload wasn't fully confirmed from public docs
+alone. The route logs the full `data` object either way
+(`console.log("Korapay webhook data:", ...)`), so check `pm2 logs
+academy-web` after the first real test payment and adjust the field name
+in that route if the match fails.
+
+Set Korapay's webhook URL (in their dashboard) to
+`https://<your-subdomain>/api/webhooks/korapay`.
 
 ## Adding a new course (repeat for each one)
 

@@ -7,13 +7,14 @@ import {
   findRecentPendingOrder,
   getLatestAccess,
 } from "../db/queries.js";
-import { createVirtualAccountForOrder } from "../services/flutterwave.js";
+import { createVirtualAccountForOrder, activeProviderName } from "../services/payment.js";
 
 // User has tapped "Proceed to payment" for a specific course.
-// This creates the pending order, requests a dynamic virtual account
-// from Flutterwave, and sends the account details to the user.
-// Actual payment confirmation happens later, via the Flutterwave webhook —
-// this handler never marks an order as paid itself.
+// This creates the pending order, requests a virtual account from
+// whichever payment provider is active (see services/payment.ts), and
+// sends the account details to the user. Actual payment confirmation
+// happens later, via that provider's webhook — this handler never marks
+// an order as paid itself.
 export async function handleConfirmOrder(ctx: Context) {
   const from = ctx.from;
   const data = ctx.callbackQuery?.data;
@@ -64,8 +65,9 @@ export async function handleConfirmOrder(ctx: Context) {
   }
 
   const order = await createOrder(user.id, course);
+  const provider = activeProviderName();
 
-  // Flutterwave requires an email; synthesize a placeholder tied to the
+  // Both providers require an email; synthesize a placeholder tied to the
   // telegram id since most users won't have one on hand mid-chat.
   const placeholderEmail = `tg${from.id}@users.abeekey.com`;
 
@@ -76,21 +78,33 @@ export async function handleConfirmOrder(ctx: Context) {
     firstName: from.first_name,
   });
 
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // Flutterwave dynamic accounts expire in ~1hr
+  // Flutterwave's dynamic accounts expire in ~1hr; Korapay's are
+  // permanent, so this is just our own bookkeeping field in that case —
+  // doesn't affect whether Korapay actually accepts the payment.
+  const expiresAt =
+    provider === "flutterwave"
+      ? new Date(Date.now() + 60 * 60 * 1000)
+      : new Date(Date.now() + 24 * 60 * 60 * 1000);
+
   await attachVirtualAccount(
     order.id,
-    "flutterwave",
+    provider,
     account.accountNumber,
     account.bankName,
     account.reference,
     expiresAt,
   );
 
+  const validityNote =
+    provider === "flutterwave"
+      ? "This account is valid for about an hour."
+      : "This account stays open — no rush, but the sooner the better.";
+
   await ctx.reply(
     `To complete your order for *${course.title}*, pay ₦${course.price_ngn} to:\n\n` +
       `🏦 *${account.bankName}*\n` +
       `💳 \`${account.accountNumber}\`\n\n` +
-      `This account is valid for about an hour. You'll get an invite link automatically once payment is confirmed — no need to send a receipt.`,
+      `${validityNote} You'll get an invite link automatically once payment is confirmed — no need to send a receipt.`,
     { parse_mode: "Markdown" },
   );
 }
