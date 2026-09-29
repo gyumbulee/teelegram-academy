@@ -1,17 +1,9 @@
-// Wrapper around Korapay's Create Virtual Bank Account API.
-// Docs: https://developers.korapay.com/docs/virtual-bank-accounts-ngn
-//
-// Unlike Flutterwave's dynamic virtual accounts, this endpoint has no
-// `amount` field at all — the account isn't locked to a specific figure,
-// which sidesteps the whole "invalid amount" failure mode we hit with
-// Flutterwave. The account_reference is what our webhook matches back to
-// the order, same pattern as the Flutterwave integration.
-//
-// Note: Korapay's API only supports permanent: true right now (temporary
-// accounts aren't available yet per their docs) — we still create a fresh
-// one per order and simply don't reuse it after that order completes, the
-// same way findRecentPendingOrder already handles reuse-within-a-window
-// for whichever provider is active.
+// Wrapper around Korapay's Bank Transfer API — generates a dynamic,
+// single-use virtual account per transaction. This is the product your
+// merchant account is actually enabled for (confirmed by Korapay
+// support), distinct from their separate "Virtual Bank Account" product
+// (permanent, customer-linked, needs a separate activation form).
+// Docs: https://developers.korapay.com/docs/bank-transfers
 
 const KORA_BASE = "https://api.korapay.com/merchant/api/v1";
 
@@ -19,6 +11,7 @@ interface VirtualAccountResult {
   accountNumber: string;
   bankName: string;
   reference: string;
+  expiresAt: Date;
 }
 
 async function korapayFetch(path: string, body: unknown) {
@@ -39,27 +32,33 @@ async function korapayFetch(path: string, body: unknown) {
 
 export async function createVirtualAccountForOrder(params: {
   orderId: number;
-  amountNgn: number; // unused by Korapay — kept so both providers share one call signature
+  amountNgn: number;
   email: string;
   firstName?: string;
+  courseSlug?: string;
 }): Promise<VirtualAccountResult> {
-  const reference = `order-${params.orderId}`;
+  // Course slug makes the reference readable in Korapay's dashboard;
+  // the order id keeps it unique even across repeat purchases of the
+  // same course. Comfortably over Korapay's 8-character minimum either way.
+  const reference = params.courseSlug
+    ? `order-${params.courseSlug}-${params.orderId}`
+    : `order-${String(params.orderId).padStart(6, "0")}`;
 
-  const account = await korapayFetch("/virtual-bank-account", {
-    account_name: params.firstName ?? "Telegram Academy Customer",
-    account_reference: reference,
-    permanent: true,
-    bank_code: process.env.KORAPAY_BANK_CODE || "035", // 035 = Wema (live); use 000 for Korapay's own sandbox
+  const charge = await korapayFetch("/charges/bank-transfer", {
+    reference,
+    amount: params.amountNgn,
     currency: "NGN",
     customer: {
       name: params.firstName ?? "Telegram Academy Customer",
       email: params.email,
     },
+    merchant_bears_cost: false,
   });
 
   return {
-    accountNumber: account.bank_account.account_number,
-    bankName: account.bank_account.bank_name,
+    accountNumber: charge.bank_account.account_number,
+    bankName: charge.bank_account.bank_name,
     reference,
+    expiresAt: new Date(charge.bank_account.expiry_date_in_utc),
   };
 }

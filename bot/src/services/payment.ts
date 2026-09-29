@@ -10,12 +10,14 @@ export interface VirtualAccountParams {
   amountNgn: number;
   email: string;
   firstName?: string;
+  courseSlug?: string;
 }
 
 export interface VirtualAccountResult {
   accountNumber: string;
   bankName: string;
   reference: string;
+  expiresAt: Date;
 }
 
 export function activeProviderName(): "flutterwave" | "korapay" {

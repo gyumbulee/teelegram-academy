@@ -12,8 +12,10 @@ export interface OrderForFulfillment {
   title: string;
 }
 
-// Looks up everything needed to fulfil an order, keyed off the Paystack
-// virtual account reference embedded at order-creation time (order-<id>).
+// Looks up everything needed to fulfil an order, keyed off the payment
+// provider's reference embedded at order-creation time (order-<id>).
+// Works for any provider — Flutterwave's tx_ref and Korapay's reference
+// both echo back exactly what we sent when creating the charge.
 export async function findOrderByReference(
   reference: string,
 ): Promise<OrderForFulfillment | null> {
@@ -34,35 +36,6 @@ export async function findOrderByReference(
      JOIN courses c ON c.id = o.course_id
      WHERE va.provider_reference = $1`,
     [reference],
-  );
-  return rows[0] ?? null;
-}
-
-// Fallback matcher for providers (Korapay) where the webhook payload's
-// exact reference field is less certain than Flutterwave's tx_ref —
-// matches on the account number itself instead, which we always store.
-export async function findOrderByAccountNumber(
-  accountNumber: string,
-): Promise<OrderForFulfillment | null> {
-  const { rows } = await pool.query<OrderForFulfillment>(
-    `SELECT
-       o.id AS order_id,
-       o.status AS order_status,
-       u.id AS user_id,
-       u.telegram_id,
-       c.id AS course_id,
-       c.type AS course_type,
-       c.telegram_channel_id,
-       c.access_duration_days,
-       c.title
-     FROM virtual_accounts va
-     JOIN orders o ON o.id = va.order_id
-     JOIN users u ON u.id = o.user_id
-     JOIN courses c ON c.id = o.course_id
-     WHERE va.account_number = $1
-     ORDER BY o.created_at DESC
-     LIMIT 1`,
-    [accountNumber],
   );
   return rows[0] ?? null;
 }

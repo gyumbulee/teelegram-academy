@@ -76,15 +76,8 @@ export async function handleConfirmOrder(ctx: Context) {
     amountNgn: Number(course.price_ngn),
     email: placeholderEmail,
     firstName: from.first_name,
+    courseSlug: course.slug,
   });
-
-  // Flutterwave's dynamic accounts expire in ~1hr; Korapay's are
-  // permanent, so this is just our own bookkeeping field in that case —
-  // doesn't affect whether Korapay actually accepts the payment.
-  const expiresAt =
-    provider === "flutterwave"
-      ? new Date(Date.now() + 60 * 60 * 1000)
-      : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   await attachVirtualAccount(
     order.id,
@@ -92,13 +85,14 @@ export async function handleConfirmOrder(ctx: Context) {
     account.accountNumber,
     account.bankName,
     account.reference,
-    expiresAt,
+    account.expiresAt,
   );
 
+  const minutesLeft = Math.round((account.expiresAt.getTime() - Date.now()) / 60000);
   const validityNote =
-    provider === "flutterwave"
-      ? "This account is valid for about an hour."
-      : "This account stays open — no rush, but the sooner the better.";
+    minutesLeft >= 60
+      ? `This account is valid for about ${Math.round(minutesLeft / 60)} hour(s).`
+      : `This account is valid for about ${minutesLeft} minutes.`;
 
   await ctx.reply(
     `To complete your order for *${course.title}*, pay ₦${course.price_ngn} to:\n\n` +

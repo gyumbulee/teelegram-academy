@@ -149,23 +149,24 @@ to whichever one is active — no other code needs to change to switch.
   pending compliance/verification item on the account (not a code issue) —
   worth confirming that's fully cleared before relying on this provider
   again.
-- **Korapay** (`services/korapay.ts`) — virtual bank accounts with no
-  amount-locking at all (no `amount` field in their creation API), so this
-  whole failure mode doesn't apply. Requires `KORAPAY_SECRET_KEY` in both
-  `bot/.env` and `web/.env`, plus `KORAPAY_BANK_CODE` (`035` = Wema, live;
-  use `000` for Korapay's own sandbox).
+- **Korapay** (`services/korapay.ts`) — uses Korapay's **Bank Transfer API**
+  (`POST /charges/bank-transfer`), which generates a dynamic, single-use
+  virtual account per transaction (Wema, Sterling, or Providus), with its
+  own real expiry time returned in the response and used directly rather
+  than guessed. This is a different product from Korapay's "Virtual Bank
+  Account" API (permanent, customer-linked accounts) — that one needs a
+  separate activation form; the Bank Transfer API is what your account is
+  actually enabled for. Requires `KORAPAY_SECRET_KEY` in both `bot/.env`
+  and `web/.env`.
 
-**Korapay webhook caveat:** `app/api/webhooks/korapay/route.ts` matches an
-incoming payment back to an order by trying `data.account_reference` first,
-falling back to matching on the account number — the exact field Korapay
-uses in a real webhook payload wasn't fully confirmed from public docs
-alone. The route logs the full `data` object either way
-(`console.log("Korapay webhook data:", ...)`), so check `pm2 logs
-academy-web` after the first real test payment and adjust the field name
-in that route if the match fails.
+Order references include the course slug for readability in both
+providers' dashboards — `order-flutter-basics-7`, not just `order-7`.
+Korapay requires at least 8 characters either way, which this comfortably
+clears.
 
 Set Korapay's webhook URL (in their dashboard) to
-`https://<your-subdomain>/api/webhooks/korapay`.
+`https://<your-subdomain>/api/webhooks/korapay` — matching is a direct
+lookup on `data.reference`, which Korapay echoes back exactly as sent.
 
 ## Adding a new course (repeat for each one)
 

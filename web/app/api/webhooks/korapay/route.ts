@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyKorapaySignature } from "@/lib/verifyKorapaySignature";
-import { findOrderByReference, findOrderByAccountNumber } from "@/lib/orders";
+import { findOrderByReference } from "@/lib/orders";
 import { fulfillPaidOrder } from "@/lib/fulfillOrder";
 
-// Korapay's exact field name for "which virtual account did this land in"
-// isn't fully nailed down from public docs alone (unlike Flutterwave's
-// well-documented tx_ref) — this tries the account_reference we set at
-// creation first, then falls back to matching by account number. Either
-// way, the full data object is logged so the correct field can be
-// confirmed and this narrowed down after seeing one real payload.
+// Korapay's Bank Transfer API echoes back the exact `reference` we sent
+// when creating the charge, in data.reference — so matching is a direct
+// lookup, same pattern as Flutterwave's tx_ref.
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const signature = req.headers.get("x-korapay-signature");
@@ -21,24 +18,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  console.log("Korapay webhook data:", JSON.stringify(body.data));
+  const reference: string | undefined = body.data?.reference;
+  if (!reference) {
+    return NextResponse.json({ error: "No reference on event" }, { status: 400 });
+  }
 
-  const data = body.data ?? {};
-  const accountReference: string | undefined =
-    data.account_reference ?? data.virtual_bank_account?.account_reference;
-  const accountNumber: string | undefined =
-    data.account_number ?? data.virtual_bank_account?.account_number;
-
-  const order = accountReference
-    ? await findOrderByReference(accountReference)
-    : accountNumber
-      ? await findOrderByAccountNumber(accountNumber)
-      : null;
-
+  const order = await findOrderByReference(reference);
   if (!order) {
-    console.error(
-      `Korapay webhook: couldn't match an order. accountReference=${accountReference} accountNumber=${accountNumber}`,
-    );
+    console.error(`Korapay webhook: no order found for reference ${reference}`);
     return NextResponse.json({ received: true });
   }
 

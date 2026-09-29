@@ -12,6 +12,7 @@ interface VirtualAccountResult {
   accountNumber: string;
   bankName: string;
   reference: string;
+  expiresAt: Date;
 }
 
 async function flutterwaveFetch(path: string, body: unknown) {
@@ -35,8 +36,11 @@ export async function createVirtualAccountForOrder(params: {
   amountNgn: number;
   email: string; // Flutterwave requires an email; synthesized from telegram_id if the user has none
   firstName?: string;
+  courseSlug?: string;
 }): Promise<VirtualAccountResult> {
-  const reference = `order-${params.orderId}`;
+  const reference = params.courseSlug
+    ? `order-${params.courseSlug}-${params.orderId}`
+    : `order-${params.orderId}`;
 
   const account = await flutterwaveFetch("/virtual-account-numbers", {
     email: params.email,
@@ -56,5 +60,6 @@ export async function createVirtualAccountForOrder(params: {
     accountNumber: account.account_number,
     bankName: account.bank_name,
     reference,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000), // Flutterwave doesn't return this; ~1hr is their documented default
   };
 }
