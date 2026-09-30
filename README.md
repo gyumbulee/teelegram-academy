@@ -168,6 +168,25 @@ Set Korapay's webhook URL (in their dashboard) to
 `https://<your-subdomain>/api/webhooks/korapay` — matching is a direct
 lookup on `data.reference`, which Korapay echoes back exactly as sent.
 
+## Lifetime vs monthly access (per course)
+
+`courses.access_duration_days` can be left blank (NULL) in the admin
+dashboard for lifetime access — once paid, that course never expires and
+the daily cron sweep skips it entirely. Set it to a number of days (30,
+etc.) for the original recurring-monthly model. Both models can coexist
+across different courses.
+
+**If upgrading an existing deployment**, run the migration once against
+your database (Supabase's SQL Editor, same as `schema.sql`):
+
+```
+db/migrations/002_lifetime_access.sql
+```
+
+This just drops the `NOT NULL` constraints on `courses.access_duration_days`
+and `channel_access.expires_at` — no data is changed, existing monthly
+courses keep working exactly as before.
+
 ## Adding a new course (repeat for each one)
 
 1. Telegram → New Channel → **Private**. Name it whatever subscribers

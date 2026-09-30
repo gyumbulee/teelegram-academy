@@ -6,6 +6,7 @@ import {
   attachVirtualAccount,
   findRecentPendingOrder,
   getLatestAccess,
+  isAccessActive,
 } from "../db/queries.js";
 import { createVirtualAccountForOrder, activeProviderName } from "../services/payment.js";
 
@@ -41,7 +42,7 @@ export async function handleConfirmOrder(ctx: Context) {
   // checked again here as the actual source of truth.
   if (course.type !== "one_on_one") {
     const access = await getLatestAccess(from.id, course.id);
-    if (access && access.status === "active" && new Date(access.expires_at) > new Date()) {
+    if (isAccessActive(access)) {
       await ctx.reply(
         `You already have active access to *${course.title}* — no need to pay again. Use "View courses" to get your invite link resent if needed.`,
         { parse_mode: "Markdown" },

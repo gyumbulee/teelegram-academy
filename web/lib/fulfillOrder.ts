@@ -42,9 +42,14 @@ export async function fulfillPaidOrder(order: OrderForFulfillment): Promise<void
     durationDays: order.access_duration_days,
   });
 
+  const accessNote =
+    order.access_duration_days === null
+      ? "This access is yours for life — no expiry, ever."
+      : `Your access runs for ${order.access_duration_days} days.`;
+
   await sendTelegramMessage(
     order.telegram_id,
-    `✅ Payment received for ${order.title}!\n\nJoin here (one-time link, valid for one use):\n${inviteLink}\n\nYour access runs for ${order.access_duration_days} days.`,
+    `✅ Payment received for ${order.title}!\n\nJoin here (one-time link, valid for one use):\n${inviteLink}\n\n${accessNote}`,
     false,
   );
 }

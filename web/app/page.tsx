@@ -75,7 +75,9 @@ export default async function HomePage() {
                       <span className="duration">
                         {course.type === "one_on_one"
                           ? "per session"
-                          : `${course.access_duration_days}-day access`}
+                          : course.access_duration_days === null
+                            ? "lifetime access"
+                            : `${course.access_duration_days}-day access`}
                       </span>
                     </span>
                     <a className="course-cta" href={telegramLinkFor(course.id)}>

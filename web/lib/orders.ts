@@ -8,7 +8,7 @@ export interface OrderForFulfillment {
   course_id: number;
   course_type: "course" | "one_on_one";
   telegram_channel_id: number | null;
-  access_duration_days: number;
+  access_duration_days: number | null; // null = lifetime access
   title: string;
 }
 
@@ -52,7 +52,7 @@ export async function grantChannelAccess(params: {
   courseId: number;
   orderId: number;
   inviteLink: string;
-  durationDays: number;
+  durationDays: number | null; // null = lifetime access; the interval math below naturally yields a NULL expires_at
 }): Promise<void> {
   await pool.query(
     `INSERT INTO channel_access

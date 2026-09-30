@@ -11,7 +11,7 @@ export interface DbCourse {
   slug: string;
   price_ngn: string;
   type: "course" | "one_on_one";
-  access_duration_days: number;
+  access_duration_days: number | null; // null = lifetime access
   telegram_channel_id: number | null;
 }
 
@@ -56,8 +56,16 @@ export async function getCourseById(id: number): Promise<DbCourse | null> {
 export interface AccessStatus {
   channel_access_id: number;
   status: "active" | "expired" | "removed";
-  expires_at: string;
+  expires_at: string | null; // null = lifetime access, never expires
   invite_link: string | null;
+}
+
+// A lifetime access row (expires_at null) is always considered active as
+// long as its status hasn't been manually changed; anything else is
+// active only while status is 'active' and the expiry hasn't passed.
+export function isAccessActive(access: AccessStatus | null): access is AccessStatus {
+  if (!access || access.status !== "active") return false;
+  return access.expires_at === null || new Date(access.expires_at) > new Date();
 }
 
 // Most recent access record for this user+course, if any. Courses are

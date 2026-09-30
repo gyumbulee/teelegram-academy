@@ -23,7 +23,7 @@ CREATE TABLE courses (
     description         TEXT,
     price_ngn           NUMERIC(12,2) NOT NULL,
     type                course_type NOT NULL DEFAULT 'course',
-    access_duration_days INTEGER NOT NULL DEFAULT 30,   -- monthly access
+    access_duration_days INTEGER DEFAULT 30,             -- monthly access; NULL = lifetime access
     telegram_channel_id BIGINT,                          -- the private channel this course grants access to (null for one_on_one)
     is_active           BOOLEAN NOT NULL DEFAULT true,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -71,7 +71,7 @@ CREATE TABLE channel_access (
     order_id    BIGINT NOT NULL REFERENCES orders(id),
     invite_link TEXT,
     granted_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    expires_at  TIMESTAMPTZ NOT NULL,
+    expires_at  TIMESTAMPTZ,      -- NULL = never expires (lifetime access)
     status      access_status NOT NULL DEFAULT 'active'
 );
 

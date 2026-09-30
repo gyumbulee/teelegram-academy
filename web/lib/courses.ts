@@ -7,7 +7,7 @@ export interface LandingCourse {
   description: string | null;
   price_ngn: string;
   type: "course" | "one_on_one";
-  access_duration_days: number;
+  access_duration_days: number | null; // null = lifetime access
 }
 
 export async function listCoursesForLanding(): Promise<LandingCourse[]> {

@@ -17,13 +17,15 @@ export default function NewCoursePage() {
     const type = formData.get("type") === "one_on_one" ? "one_on_one" : "course";
     const channelId = String(formData.get("telegramChannelId") ?? "").trim();
 
+    const rawDuration = String(formData.get("accessDurationDays") ?? "").trim();
+
     const { id } = await createCourse({
       title,
       slug: slugify(title),
       description: String(formData.get("description") ?? ""),
       priceNgn: Number(formData.get("priceNgn")),
       type,
-      accessDurationDays: Number(formData.get("accessDurationDays") ?? 30),
+      accessDurationDays: rawDuration ? Number(rawDuration) : null,
       telegramChannelId: channelId ? channelId : null,
     });
 
@@ -72,7 +74,7 @@ export default function NewCoursePage() {
 
           <div className="admin-form-row">
             <label>
-              <span>Access length (days)</span>
+              <span>Access length (days) — leave blank for lifetime</span>
               <input
                 name="accessDurationDays"
                 type="number"

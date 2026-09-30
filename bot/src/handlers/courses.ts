@@ -4,14 +4,17 @@ import {
   getCourseById,
   getLatestAccess,
   updateInviteLink,
+  isAccessActive,
+  AccessStatus,
 } from "../db/queries.js";
 
-function formatExpiry(expiresAt: string): string {
-  return new Date(expiresAt).toLocaleDateString("en-NG", {
+function formatExpiry(expiresAt: string | null): string {
+  if (expiresAt === null) return "lifetime — never expires";
+  return `valid until ${new Date(expiresAt).toLocaleDateString("en-NG", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  });
+  })}`;
 }
 
 export async function handleShowCourses(ctx: Context) {
@@ -29,15 +32,17 @@ export async function handleShowCourses(ctx: Context) {
     let suffix = "";
     if (course.type !== "one_on_one" && telegramId) {
       const access = await getLatestAccess(telegramId, course.id);
-      if (access && access.status === "active" && new Date(access.expires_at) > new Date()) {
+      if (isAccessActive(access)) {
         suffix = " ✅";
       }
     }
 
+    const priceLabel =
+      course.access_duration_days === null ? `₦${course.price_ngn}` : `₦${course.price_ngn}/mo`;
     const label =
       course.type === "one_on_one"
         ? `🎓 ${course.title} — ₦${course.price_ngn} (1-on-1)`
-        : `${course.title} — ₦${course.price_ngn}/mo${suffix}`;
+        : `${course.title} — ${priceLabel}${suffix}`;
     keyboard.text(label, `buy_course_${course.id}`).row();
   }
 
@@ -52,10 +57,11 @@ export async function handleShowCourses(ctx: Context) {
 // /start deep-link flow (arriving from the landing page with a course
 // already chosen) — both end up showing the same course detail screen.
 //
-// If the user already has active (non-expired) access to this course, we
-// don't offer to pay again — instead we offer to reissue their invite
-// link, since the original one-time link can't be reused if they left
-// the channel by mistake.
+// If the user already has active access to this course, we don't offer
+// to pay again — instead we offer to reissue their invite link, since the
+// original one-time link can't be reused if they left the channel by
+// mistake. This applies the same way whether that access is lifetime
+// (expires_at null) or a still-current monthly period.
 export async function sendCourseDetail(ctx: Context, courseId: number) {
   const course = await getCourseById(courseId);
   if (!course) {
@@ -64,21 +70,18 @@ export async function sendCourseDetail(ctx: Context, courseId: number) {
   }
 
   const telegramId = ctx.from?.id;
-  const access =
+  const access: AccessStatus | null =
     course.type !== "one_on_one" && telegramId
       ? await getLatestAccess(telegramId, course.id)
       : null;
 
-  const isActive =
-    access && access.status === "active" && new Date(access.expires_at) > new Date();
-
-  if (isActive && access) {
+  if (isAccessActive(access)) {
     const keyboard = new InlineKeyboard().text(
       "🔗 Resend my invite link",
       `resend_invite_${course.id}`,
     );
     await ctx.reply(
-      `*${course.title}*\nYou already have access to this course, valid until ${formatExpiry(access.expires_at)}.\n\nLost the invite or left the channel by accident? Tap below for a fresh link.`,
+      `*${course.title}*\nYou already have access to this course (${formatExpiry(access.expires_at)}).\n\nLost the invite or left the channel by accident? Tap below for a fresh link.`,
       { reply_markup: keyboard, parse_mode: "Markdown" },
     );
     return;
@@ -92,9 +95,11 @@ export async function sendCourseDetail(ctx: Context, courseId: number) {
   const accessNote =
     course.type === "one_on_one"
       ? "You'll be able to book a session after payment."
-      : access
-        ? `Your previous access expired ${formatExpiry(access.expires_at)} — this renews it for another ${course.access_duration_days} days.`
-        : `You'll get ${course.access_duration_days}-day access to the course channel.`;
+      : course.access_duration_days === null
+        ? "You'll get lifetime access to the course channel — no expiry, ever."
+        : access
+          ? `Your previous access expired — this renews it for another ${course.access_duration_days} days.`
+          : `You'll get ${course.access_duration_days}-day access to the course channel.`;
 
   await ctx.reply(
     `*${course.title}*\nPrice: ₦${course.price_ngn}\n${accessNote}`,
@@ -145,6 +150,6 @@ export async function handleResendInvite(ctx: Context) {
   await updateInviteLink(access.channel_access_id, inviteLink.invite_link);
 
   await ctx.reply(
-    `Here's a fresh invite link for ${course.title} (valid until ${formatExpiry(access.expires_at)}):\n${inviteLink.invite_link}`,
+    `Here's a fresh invite link for ${course.title} (${formatExpiry(access.expires_at)}):\n${inviteLink.invite_link}`,
   );
 }

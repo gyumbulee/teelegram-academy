@@ -7,7 +7,7 @@ export interface CourseWithStats {
   description: string | null;
   price_ngn: string;
   type: "course" | "one_on_one";
-  access_duration_days: number;
+  access_duration_days: number | null; // null = lifetime access
   telegram_channel_id: string | null;
   is_active: boolean;
   active_subscribers: string;
@@ -37,7 +37,7 @@ export interface CourseDetail {
   description: string | null;
   price_ngn: string;
   type: "course" | "one_on_one";
-  access_duration_days: number;
+  access_duration_days: number | null; // null = lifetime access
   telegram_channel_id: string | null;
   is_active: boolean;
 }
@@ -74,7 +74,7 @@ export interface CourseInput {
   description: string;
   priceNgn: number;
   type: "course" | "one_on_one";
-  accessDurationDays: number;
+  accessDurationDays: number | null; // null = lifetime access
   telegramChannelId: string | null;
 }
 

@@ -22,6 +22,7 @@ export default async function EditCoursePage({
   async function save(formData: FormData) {
     "use server";
     const channelId = String(formData.get("telegramChannelId") ?? "").trim();
+    const rawDuration = String(formData.get("accessDurationDays") ?? "").trim();
 
     await updateCourse(id, {
       title: String(formData.get("title") ?? "").trim(),
@@ -29,7 +30,7 @@ export default async function EditCoursePage({
       description: String(formData.get("description") ?? ""),
       priceNgn: Number(formData.get("priceNgn")),
       type: formData.get("type") === "one_on_one" ? "one_on_one" : "course",
-      accessDurationDays: Number(formData.get("accessDurationDays") ?? 30),
+      accessDurationDays: rawDuration ? Number(rawDuration) : null,
       telegramChannelId: channelId ? channelId : null,
     });
 
@@ -113,12 +114,12 @@ export default async function EditCoursePage({
 
           <div className="admin-form-row">
             <label>
-              <span>Access length (days)</span>
+              <span>Access length (days) — leave blank for lifetime</span>
               <input
                 name="accessDurationDays"
                 type="number"
                 min="1"
-                defaultValue={course.access_duration_days}
+                defaultValue={course.access_duration_days ?? ""}
               />
             </label>
             <label>
