@@ -23,6 +23,13 @@ export default async function EditCoursePage({
     "use server";
     const channelId = String(formData.get("telegramChannelId") ?? "").trim();
     const rawDuration = String(formData.get("accessDurationDays") ?? "").trim();
+    // Blank AND "0" both mean lifetime access. People naturally type 0 to
+    // mean "no limit", and previously that got stored literally as
+    // "expires after 0 days" instead of NULL (lifetime) — Flutter Basics
+    // hit exactly this. Number(rawDuration) > 0 catches both cases plus
+    // any other non-positive input.
+    const parsedDuration = Number(rawDuration);
+    const accessDurationDays = rawDuration && parsedDuration > 0 ? parsedDuration : null;
 
     await updateCourse(id, {
       title: String(formData.get("title") ?? "").trim(),
@@ -30,7 +37,7 @@ export default async function EditCoursePage({
       description: String(formData.get("description") ?? ""),
       priceNgn: Number(formData.get("priceNgn")),
       type: formData.get("type") === "one_on_one" ? "one_on_one" : "course",
-      accessDurationDays: rawDuration ? Number(rawDuration) : null,
+      accessDurationDays,
       telegramChannelId: channelId ? channelId : null,
     });
 
@@ -114,11 +121,11 @@ export default async function EditCoursePage({
 
           <div className="admin-form-row">
             <label>
-              <span>Access length (days) — leave blank for lifetime</span>
+              <span>Access length (days) — leave blank or enter 0 for lifetime</span>
               <input
                 name="accessDurationDays"
                 type="number"
-                min="1"
+                min="0"
                 defaultValue={course.access_duration_days ?? ""}
               />
             </label>

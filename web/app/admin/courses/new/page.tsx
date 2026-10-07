@@ -18,6 +18,10 @@ export default function NewCoursePage() {
     const channelId = String(formData.get("telegramChannelId") ?? "").trim();
 
     const rawDuration = String(formData.get("accessDurationDays") ?? "").trim();
+    // Blank AND "0" both mean lifetime access — see the matching comment
+    // in app/admin/courses/[id]/page.tsx for why.
+    const parsedDuration = Number(rawDuration);
+    const accessDurationDays = rawDuration && parsedDuration > 0 ? parsedDuration : null;
 
     const { id } = await createCourse({
       title,
@@ -25,7 +29,7 @@ export default function NewCoursePage() {
       description: String(formData.get("description") ?? ""),
       priceNgn: Number(formData.get("priceNgn")),
       type,
-      accessDurationDays: rawDuration ? Number(rawDuration) : null,
+      accessDurationDays,
       telegramChannelId: channelId ? channelId : null,
     });
 
@@ -74,11 +78,11 @@ export default function NewCoursePage() {
 
           <div className="admin-form-row">
             <label>
-              <span>Access length (days) — leave blank for lifetime</span>
+              <span>Access length (days) — leave blank or enter 0 for lifetime</span>
               <input
                 name="accessDurationDays"
                 type="number"
-                min="1"
+                min="0"
                 defaultValue={30}
               />
             </label>
