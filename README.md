@@ -139,10 +139,24 @@ Phase 3 (custom 1-on-1 scheduling) is next when subscribers start asking for it.
 ## Payment providers
 
 Which provider is active is a single switch: `PAYMENT_PROVIDER` in
-`bot/.env` (`flutterwave` or `korapay`, defaults to `flutterwave` if unset).
-Everything else in the bot calls `services/payment.ts`, which dispatches
-to whichever one is active — no other code needs to change to switch.
+`bot/.env` (`flutterwave`, `korapay`, or `paystack` — defaults to
+`flutterwave` if unset, but `.env.example` ships with `paystack` as the
+suggested default). Everything else in the bot calls `services/payment.ts`,
+which dispatches to whichever one is active — no other code needs to
+change to switch.
 
+- **Paystack** (`services/paystack.ts`) — uses Paystack's **Charge API**
+  with the `bank_transfer` channel (`POST /charge`), which generates a
+  dynamic, single-use virtual account per transaction locked to the exact
+  order amount with a ~1hr expiry (`account_expires_at`). This is
+  deliberately *not* Paystack's separate "Dedicated Virtual Account"
+  product — DVAs are permanent, assigned once per customer forever, and
+  need their own activation on top of a verified business. Pay-with-Transfer
+  via the Charge API needs no extra activation beyond a normal Paystack
+  business account, which is why we picked it. Amounts are in **kobo**
+  (naira × 100) — unlike Flutterwave and Korapay, which both take naira
+  directly. Requires `PAYSTACK_SECRET_KEY` in both `bot/.env` and
+  `web/.env`.
 - **Flutterwave** (`services/flutterwave.ts`) — dynamic virtual accounts,
   locked to both an exact amount and a ~1hr expiry window. We hit
   persistent "Invalid amount" rejections in live mode traced back to a
@@ -159,7 +173,7 @@ to whichever one is active — no other code needs to change to switch.
   actually enabled for. Requires `KORAPAY_SECRET_KEY` in both `bot/.env`
   and `web/.env`.
 
-Order references include the course slug for readability in both
+Order references include the course slug for readability in all three
 providers' dashboards — `order-flutter-basics-7`, not just `order-7`.
 Korapay requires at least 8 characters either way, which this comfortably
 clears.
@@ -167,6 +181,14 @@ clears.
 Set Korapay's webhook URL (in their dashboard) to
 `https://<your-subdomain>/api/webhooks/korapay` — matching is a direct
 lookup on `data.reference`, which Korapay echoes back exactly as sent.
+
+Set Paystack's webhook URL (in their dashboard, under Settings → API Keys
+& Webhooks) to `https://<your-subdomain>/api/webhooks/paystack`. Paystack
+signs the raw webhook body with HMAC-SHA512 using your `PAYSTACK_SECRET_KEY`
+(sent in the `x-paystack-signature` header) — the same secret key used for
+API calls, no separate webhook secret. Matching is a direct lookup on
+`data.reference`, which Paystack echoes back exactly as sent, same as the
+other two providers.
 
 ## Lifetime vs monthly access (per course)
 
