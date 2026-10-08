@@ -6,6 +6,7 @@
   --amber: #d4832f;
   --moss: #6c7a56;
   --ash: #8b8b80;
+  --rust: #b3432b;
   --text-on-ink: #ece7d8;
   --text-on-paper: #15181b;
 
@@ -357,6 +358,27 @@ button:focus-visible {
 
 .btn-quiet:hover {
   background: rgba(0, 0, 0, 0.04);
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--rust);
+  border: 1px solid var(--rust);
+}
+
+.btn-danger:hover {
+  background: rgba(179, 67, 43, 0.08);
+}
+
+.admin-error {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--rust);
+  background: rgba(179, 67, 43, 0.08);
+  border: 1px solid var(--rust);
+  border-radius: 2px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
 }
 
 .admin-table {

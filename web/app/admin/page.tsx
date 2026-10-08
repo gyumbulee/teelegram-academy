@@ -1,8 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { listCoursesWithStats, setCourseActive } from "@/lib/admin";
+import { listCoursesWithStats, setCourseActive, deleteCourse } from "@/lib/admin";
+import { DeleteCourseButton } from "./DeleteCourseButton";
 
-export default async function AdminHome() {
+export default async function AdminHome({
+  searchParams,
+}: {
+  searchParams: { error?: string };
+}) {
   const courses = await listCoursesWithStats();
 
   const totalRevenue = courses.reduce((sum, c) => sum + Number(c.revenue_ngn), 0);
@@ -13,6 +19,29 @@ export default async function AdminHome() {
     const id = Number(formData.get("id"));
     const nextState = formData.get("nextState") === "true";
     await setCourseActive(id, nextState);
+    revalidatePath("/admin");
+  }
+
+  async function deleteCourseAction(formData: FormData) {
+    "use server";
+    const id = Number(formData.get("id"));
+
+    try {
+      await deleteCourse(id);
+    } catch (err) {
+      // Postgres 23503 = foreign_key_violation — this course has orders,
+      // channel_access or bookings referencing it (see the comment on
+      // deleteCourse in lib/admin.ts). Any other error gets its own message
+      // instead of a raw stack trace.
+      const message =
+        (err as { code?: string })?.code === "23503"
+          ? "Can't delete — this course has order history. Unpublish it instead."
+          : err instanceof Error
+            ? err.message
+            : "Failed to delete course.";
+      redirect(`/admin?error=${encodeURIComponent(message)}`);
+    }
+
     revalidatePath("/admin");
   }
 
@@ -28,6 +57,8 @@ export default async function AdminHome() {
       </header>
 
       <main className="admin-main">
+        {searchParams.error && <p className="admin-error">{searchParams.error}</p>}
+
         <div className="admin-toolbar">
           <h2>
             Courses · ₦{totalRevenue.toLocaleString("en-NG")} total · {totalSubscribers} active
@@ -86,6 +117,10 @@ export default async function AdminHome() {
                       <button className="btn btn-quiet" type="submit">
                         {course.is_active ? "Unpublish" : "Publish"}
                       </button>
+                    </form>
+                    <form action={deleteCourseAction}>
+                      <input type="hidden" name="id" value={course.id} />
+                      <DeleteCourseButton courseTitle={course.title} />
                     </form>
                   </td>
                 </tr>

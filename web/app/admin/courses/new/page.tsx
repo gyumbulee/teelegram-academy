@@ -9,7 +9,11 @@ function slugify(title: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-export default function NewCoursePage() {
+export default function NewCoursePage({
+  searchParams,
+}: {
+  searchParams: { error?: string };
+}) {
   async function create(formData: FormData) {
     "use server";
 
@@ -23,17 +27,33 @@ export default function NewCoursePage() {
     const parsedDuration = Number(rawDuration);
     const accessDurationDays = rawDuration && parsedDuration > 0 ? parsedDuration : null;
 
-    const { id } = await createCourse({
-      title,
-      slug: slugify(title),
-      description: String(formData.get("description") ?? ""),
-      priceNgn: Number(formData.get("priceNgn")),
-      type,
-      accessDurationDays,
-      telegramChannelId: channelId ? channelId : null,
-    });
+    // The redirect on success sits OUTSIDE this try/catch on purpose: Next's
+    // redirect() works by throwing a special, framework-handled error, and
+    // catching it here (even to rethrow) risks swallowing the navigation. A
+    // real failure (duplicate slug, missing required field at the DB level,
+    // bad DB connection, etc.) redirects back to this same form with the
+    // message in the URL instead of crashing to Next's generic error page.
+    try {
+      await createCourse({
+        title,
+        slug: slugify(title),
+        description: String(formData.get("description") ?? ""),
+        priceNgn: Number(formData.get("priceNgn")),
+        type,
+        accessDurationDays,
+        telegramChannelId: channelId ? channelId : null,
+      });
+    } catch (err) {
+      const message =
+        (err as { code?: string })?.code === "23505"
+          ? "A course with that title/slug already exists — try a slightly different title."
+          : err instanceof Error
+            ? err.message
+            : "Failed to create course.";
+      redirect(`/admin/courses/new?error=${encodeURIComponent(message)}`);
+    }
 
-    redirect(`/admin/courses/${id}`);
+    redirect("/admin");
   }
 
   return (
@@ -48,6 +68,8 @@ export default function NewCoursePage() {
       </header>
 
       <main className="admin-main">
+        {searchParams.error && <p className="admin-error">{searchParams.error}</p>}
+
         <form className="admin-form" action={create}>
           <label>
             <span>Title</span>

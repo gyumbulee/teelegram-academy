@@ -120,6 +120,18 @@ export async function setCourseActive(id: number, isActive: boolean): Promise<vo
   await pool.query(`UPDATE courses SET is_active = $2 WHERE id = $1`, [id, isActive]);
 }
 
+// Lessons cascade automatically (ON DELETE CASCADE in the schema), but
+// orders/channel_access/bookings deliberately do NOT — they're payment and
+// access history, and silently cascading those away would erase a record of
+// real money changing hands. So this throws a Postgres foreign-key-violation
+// error (code 23503) for any course that has ever had an order placed
+// against it; the caller is expected to catch that and tell the admin to
+// unpublish instead of delete. A course with zero orders (a test course, a
+// duplicate, one created by mistake) deletes cleanly.
+export async function deleteCourse(id: number): Promise<void> {
+  await pool.query(`DELETE FROM courses WHERE id = $1`, [id]);
+}
+
 export async function addLesson(
   courseId: number,
   title: string,
