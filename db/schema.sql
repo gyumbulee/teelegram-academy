@@ -1,4 +1,4 @@
--- Telegram Academy — Phase 1 schema (core paid loop)
+-- Abeekey Academy — Phase 1 schema (core paid loop)
 -- Users, Courses, Orders, Virtual Accounts, Channel Access, Bookings (1-on-1)
 
 CREATE TYPE course_type AS ENUM ('course', 'one_on_one');
@@ -12,6 +12,7 @@ CREATE TABLE users (
     telegram_id     BIGINT UNIQUE NOT NULL,
     telegram_username TEXT,
     first_name      TEXT,
+    language        TEXT NOT NULL DEFAULT 'en',  -- 'en' or 'ha' (Hausa); set via the bot's language menu
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

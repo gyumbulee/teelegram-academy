@@ -1,6 +1,6 @@
 // Wrapper around Paystack's Charge API, using the "bank_transfer" channel
-// to generate a one-time, temporary virtual account per order — the same
-// shape as Flutterwave/Korapay (exact amount, short expiry window).
+// to generate a one-time, temporary virtual account per order (exact
+// amount, short expiry window).
 //
 // This is deliberately NOT Paystack's separate "Dedicated Virtual Account"
 // product (which assigns one permanent account per customer forever, and
@@ -9,8 +9,7 @@
 // business account.
 // Docs: https://paystack.com/docs/payments/payment-channels/
 //
-// Gotcha: Paystack amounts are in kobo, not naira — unlike Flutterwave and
-// Korapay, which both take naira directly.
+// Gotcha: Paystack amounts are in kobo, not naira.
 
 const PAYSTACK_BASE = "https://api.paystack.co";
 const EXPIRY_MS = 60 * 60 * 1000; // 1 hour; Paystack allows 15 min–8 hr
@@ -45,9 +44,8 @@ export async function createVirtualAccountForOrder(params: {
   firstName?: string;
   courseSlug?: string;
 }): Promise<VirtualAccountResult> {
-  // Same reference convention as Flutterwave/Korapay, so dashboards across
-  // all three stay readable and web/lib/orders.ts's provider-agnostic
-  // findOrderByReference() keeps working unchanged.
+  // Readable reference for the Paystack dashboard and
+  // web/lib/orders.ts's findOrderByReference().
   const reference = params.courseSlug
     ? `order-${params.courseSlug}-${params.orderId}`
     : `order-${params.orderId}`;

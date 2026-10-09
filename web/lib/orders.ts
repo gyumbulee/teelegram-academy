@@ -12,10 +12,9 @@ export interface OrderForFulfillment {
   title: string;
 }
 
-// Looks up everything needed to fulfil an order, keyed off the payment
-// provider's reference embedded at order-creation time (order-<id>).
-// Works for any provider — Flutterwave's tx_ref and Korapay's reference
-// both echo back exactly what we sent when creating the charge.
+// Looks up everything needed to fulfil an order, keyed off the Paystack
+// reference embedded at order-creation time (order-<id>), which Paystack
+// echoes back exactly as sent when creating the charge.
 export async function findOrderByReference(
   reference: string,
 ): Promise<OrderForFulfillment | null> {
@@ -82,7 +81,7 @@ export interface StalePendingOrder {
 }
 
 // Orders past their virtual account's ~1hr window that never got paid.
-// 65 minutes gives a small buffer past Flutterwave's own account expiry
+// 65 minutes gives a small buffer past Paystack's own account expiry
 // so we don't race a payment that's still mid-flight.
 export async function findStalePendingOrders(): Promise<StalePendingOrder[]> {
   const { rows } = await pool.query<StalePendingOrder>(

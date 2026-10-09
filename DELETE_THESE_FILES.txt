@@ -1,0 +1,29 @@
+After extracting this zip into your project, delete these files — they're
+the removed Flutterwave/Korapay code and are no longer imported by anything:
+
+bot/src/services/flutterwave.ts
+bot/src/services/korapay.ts
+bot/src/services/payment.ts
+web/lib/verifyFlutterwaveSignature.ts
+web/lib/verifyKorapaySignature.ts
+web/app/api/webhooks/flutterwave/route.ts   (whole folder: web/app/api/webhooks/flutterwave/)
+web/app/api/webhooks/korapay/route.ts       (whole folder: web/app/api/webhooks/korapay/)
+
+Then run this migration against your database (same way you ran
+002_lifetime_access.sql):
+
+db/migrations/003_user_language.sql
+
+And add ADMIN_SESSION_SECRET to web/.env (any long random string — it
+signs the new admin login's session cookie):
+
+ADMIN_SESSION_SECRET=<generate one, e.g. `openssl rand -hex 32`>
+
+Also remove these now-unused env vars from bot/.env and web/.env:
+PAYMENT_PROVIDER, FLUTTERWAVE_SECRET_KEY, FLUTTERWAVE_SECRET_HASH,
+KORAPAY_SECRET_KEY
+
+Rebuild both apps and restart:
+  cd bot && npm run build && pm2 restart academy-bot --update-env
+  cd web && npm run build && pm2 restart academy-web --update-env
+  (or your actual PM2 process names)

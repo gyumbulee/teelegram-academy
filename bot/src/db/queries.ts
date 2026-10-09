@@ -1,8 +1,10 @@
 import { pool } from "./pool.js";
+import type { Lang } from "../i18n.js";
 
 export interface DbUser {
   id: number;
   telegram_id: number;
+  language: Lang;
 }
 
 export interface DbCourse {
@@ -28,10 +30,30 @@ export async function upsertUser(
      ON CONFLICT (telegram_id)
      DO UPDATE SET telegram_username = EXCLUDED.telegram_username,
                    first_name = EXCLUDED.first_name
-     RETURNING id, telegram_id`,
+     RETURNING id, telegram_id, language`,
     [telegramId, username ?? null, firstName ?? null],
   );
   return rows[0];
+}
+
+// Looked up on practically every interaction (to pick which language to
+// reply in), keyed by telegram_id directly so handlers don't need the
+// internal user id on hand. Defaults to English for a telegram_id that
+// hasn't messaged the bot yet — shouldn't normally happen since /start
+// always upserts first, but keeps callers safe either way.
+export async function getUserLanguage(telegramId: number): Promise<Lang> {
+  const { rows } = await pool.query<{ language: Lang }>(
+    `SELECT language FROM users WHERE telegram_id = $1`,
+    [telegramId],
+  );
+  return rows[0]?.language ?? "en";
+}
+
+export async function setUserLanguage(telegramId: number, language: Lang): Promise<void> {
+  await pool.query(`UPDATE users SET language = $2 WHERE telegram_id = $1`, [
+    telegramId,
+    language,
+  ]);
 }
 
 export async function listActiveCourses(): Promise<DbCourse[]> {
@@ -85,6 +107,35 @@ export async function getLatestAccess(
     [telegramId, courseId],
   );
   return rows[0] ?? null;
+}
+
+export interface ActiveAccessRow {
+  course_id: number;
+  title: string;
+  channel_access_id: number;
+  status: "active" | "expired" | "removed";
+  expires_at: string | null;
+}
+
+// Everything a user currently has working access to — for the "🧾 My
+// access" menu button, so someone who's forgotten what they bought (or
+// lost their invite link) can find it in one tap instead of re-browsing
+// the whole course list. Deliberately not filtered by courses.is_active:
+// if a course gets unpublished from new sales, existing buyers should
+// still see and reach what they already paid for.
+export async function listActiveAccessForUser(telegramId: number): Promise<ActiveAccessRow[]> {
+  const { rows } = await pool.query<ActiveAccessRow>(
+    `SELECT c.id AS course_id, c.title, ca.id AS channel_access_id, ca.status, ca.expires_at
+     FROM channel_access ca
+     JOIN users u ON u.id = ca.user_id
+     JOIN courses c ON c.id = ca.course_id
+     WHERE u.telegram_id = $1
+       AND ca.status = 'active'
+       AND (ca.expires_at IS NULL OR ca.expires_at > now())
+     ORDER BY ca.expires_at ASC NULLS FIRST`,
+    [telegramId],
+  );
+  return rows;
 }
 
 export async function updateInviteLink(

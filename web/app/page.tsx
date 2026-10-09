@@ -22,7 +22,7 @@ export default async function HomePage() {
       <header className="site-header">
         <div className="wrap">
           <a className="wordmark" href="/">
-            TELEGRAM ACADEMY
+            ABEEKEY ACADEMY
           </a>
         </div>
       </header>
@@ -125,7 +125,7 @@ export default async function HomePage() {
 
       <footer className="site-footer">
         <div className="wrap">
-          Telegram Academy — built by Abeekey.{" "}
+          Abeekey Academy — a product of Abeekey.{" "}
           <a href={telegramLinkGeneric()}>Message the bot</a>
         </div>
       </footer>

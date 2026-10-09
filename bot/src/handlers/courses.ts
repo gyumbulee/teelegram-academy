@@ -3,27 +3,31 @@ import {
   listActiveCourses,
   getCourseById,
   getLatestAccess,
+  getUserLanguage,
   updateInviteLink,
   isAccessActive,
   AccessStatus,
 } from "../db/queries.js";
+import { t, Lang } from "../i18n.js";
 
-function formatExpiry(expiresAt: string | null): string {
-  if (expiresAt === null) return "lifetime — never expires";
-  return `valid until ${new Date(expiresAt).toLocaleDateString("en-NG", {
+export function formatExpiry(expiresAt: string | null, lang: Lang): string {
+  if (expiresAt === null) return t(lang, "access_lifetime");
+  const date = new Date(expiresAt).toLocaleDateString(lang === "ha" ? "ha" : "en-NG", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  })}`;
+  });
+  return t(lang, "access_valid_until", { date });
 }
 
 export async function handleShowCourses(ctx: Context) {
-  const courses = await listActiveCourses();
   const telegramId = ctx.from?.id;
+  const lang = telegramId ? await getUserLanguage(telegramId) : "en";
+  const courses = await listActiveCourses();
 
   if (courses.length === 0) {
-    await ctx.answerCallbackQuery?.();
-    await ctx.reply("No courses available right now — check back soon.");
+    if (ctx.callbackQuery) await ctx.answerCallbackQuery();
+    await ctx.reply(t(lang, "no_courses"));
     return;
   }
 
@@ -46,11 +50,8 @@ export async function handleShowCourses(ctx: Context) {
     keyboard.text(label, `buy_course_${course.id}`).row();
   }
 
-  await ctx.answerCallbackQuery?.();
-  await ctx.reply(
-    "Here's what's available (✅ = you already have active access):",
-    { reply_markup: keyboard },
-  );
+  if (ctx.callbackQuery) await ctx.answerCallbackQuery();
+  await ctx.reply(t(lang, "course_list_header"), { reply_markup: keyboard });
 }
 
 // Shared by the callback-query flow (tapping a course button) and the
@@ -63,13 +64,15 @@ export async function handleShowCourses(ctx: Context) {
 // mistake. This applies the same way whether that access is lifetime
 // (expires_at null) or a still-current monthly period.
 export async function sendCourseDetail(ctx: Context, courseId: number) {
+  const telegramId = ctx.from?.id;
+  const lang = telegramId ? await getUserLanguage(telegramId) : "en";
+
   const course = await getCourseById(courseId);
   if (!course) {
-    await ctx.reply("That course isn't available anymore.");
+    await ctx.reply(t(lang, "course_unavailable"));
     return;
   }
 
-  const telegramId = ctx.from?.id;
   const access: AccessStatus | null =
     course.type !== "one_on_one" && telegramId
       ? await getLatestAccess(telegramId, course.id)
@@ -77,32 +80,32 @@ export async function sendCourseDetail(ctx: Context, courseId: number) {
 
   if (isAccessActive(access)) {
     const keyboard = new InlineKeyboard().text(
-      "🔗 Resend my invite link",
+      t(lang, "resend_invite_button"),
       `resend_invite_${course.id}`,
     );
     await ctx.reply(
-      `*${course.title}*\nYou already have access to this course (${formatExpiry(access.expires_at)}).\n\nLost the invite or left the channel by accident? Tap below for a fresh link.`,
+      t(lang, "already_have_access", {
+        title: course.title,
+        expiry: formatExpiry(access.expires_at, lang),
+      }),
       { reply_markup: keyboard, parse_mode: "Markdown" },
     );
     return;
   }
 
-  const keyboard = new InlineKeyboard().text(
-    "💳 Proceed to payment",
-    `confirm_order_${course.id}`,
-  );
+  const keyboard = new InlineKeyboard().text(t(lang, "pay_button"), `confirm_order_${course.id}`);
 
   const accessNote =
     course.type === "one_on_one"
-      ? "You'll be able to book a session after payment."
+      ? t(lang, "access_note_one_on_one")
       : course.access_duration_days === null
-        ? "You'll get lifetime access to the course channel — no expiry, ever."
+        ? t(lang, "access_note_lifetime")
         : access
-          ? `Your previous access expired — this renews it for another ${course.access_duration_days} days.`
-          : `You'll get ${course.access_duration_days}-day access to the course channel.`;
+          ? t(lang, "access_note_renew", { days: course.access_duration_days })
+          : t(lang, "access_note_duration", { days: course.access_duration_days });
 
   await ctx.reply(
-    `*${course.title}*\nPrice: ₦${course.price_ngn}\n${accessNote}`,
+    t(lang, "course_detail", { title: course.title, price: course.price_ngn, accessNote }),
     { reply_markup: keyboard, parse_mode: "Markdown" },
   );
 }
@@ -113,7 +116,8 @@ export async function handleCourseSelected(ctx: Context) {
   const courseId = data ? Number(data.replace("buy_course_", "")) : NaN;
 
   if (!Number.isFinite(courseId)) {
-    await ctx.answerCallbackQuery({ text: "That course isn't available anymore." });
+    const lang = ctx.from ? await getUserLanguage(ctx.from.id) : "en";
+    await ctx.answerCallbackQuery({ text: t(lang, "course_unavailable") });
     return;
   }
 
@@ -128,9 +132,10 @@ export async function handleResendInvite(ctx: Context) {
   const data = ctx.callbackQuery?.data;
   const courseId = data ? Number(data.replace("resend_invite_", "")) : NaN;
   const telegramId = ctx.from?.id;
+  const lang = telegramId ? await getUserLanguage(telegramId) : "en";
 
   if (!Number.isFinite(courseId) || !telegramId) {
-    await ctx.answerCallbackQuery({ text: "Something went wrong, try again." });
+    await ctx.answerCallbackQuery({ text: t(lang, "generic_error") });
     return;
   }
 
@@ -138,7 +143,7 @@ export async function handleResendInvite(ctx: Context) {
   const access = await getLatestAccess(telegramId, courseId);
 
   if (!course?.telegram_channel_id || !access) {
-    await ctx.answerCallbackQuery({ text: "No active access found." });
+    await ctx.answerCallbackQuery({ text: t(lang, "resend_invite_none") });
     return;
   }
 
@@ -150,6 +155,10 @@ export async function handleResendInvite(ctx: Context) {
   await updateInviteLink(access.channel_access_id, inviteLink.invite_link);
 
   await ctx.reply(
-    `Here's a fresh invite link for ${course.title} (${formatExpiry(access.expires_at)}):\n${inviteLink.invite_link}`,
+    t(lang, "resend_invite_sent", {
+      title: course.title,
+      expiry: formatExpiry(access.expires_at, lang),
+      link: inviteLink.invite_link,
+    }),
   );
 }

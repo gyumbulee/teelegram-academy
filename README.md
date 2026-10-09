@@ -1,4 +1,4 @@
-# Telegram Academy
+# Abeekey Academy
 
 Paid training academy run through Telegram — see project context for full details.
 
@@ -21,17 +21,17 @@ psql -d telegram_academy -f db/schema.sql
 
 2. `bot/` — grammY bot covering: `/start` → capture Telegram user →
    list courses → select course → create pending order → generate a
-   Flutterwave dynamic virtual account and send payment details.
+   Paystack dynamic virtual account and send payment details.
 
 ```
 cd bot
-cp .env.example .env   # fill in BOT_TOKEN, DATABASE_URL, FLUTTERWAVE_SECRET_KEY
+cp .env.example .env   # fill in BOT_TOKEN, DATABASE_URL, PAYSTACK_SECRET_KEY
 npm install
 npm run dev
 ```
 
 Note: the bot never marks an order as paid itself — that happens in the
-webhook handler, which listens for Flutterwave's payment confirmation and
+webhook handler, which listens for Paystack's payment confirmation and
 then generates the channel invite link.
 
 **Resubscribe / duplicate-order handling** (in `bot/src/handlers/courses.ts`
@@ -48,12 +48,14 @@ and `order.ts`):
   server-side in the order handler too, not just hidden by the UI, since
   callback buttons can get tapped out of order).
 
-3. `web/` — Next.js app. So far just the Flutterwave webhook handler at
-   `app/api/webhooks/flutterwave/route.ts`:
-   - Verifies the `verif-hash` header against your Flutterwave secret hash
-   - Looks up the order from the `virtual_accounts.provider_reference`
-     (matched against Flutterwave's `tx_ref`)
-   - Marks the order `paid` (idempotent — safe if Flutterwave retries the event)
+3. `web/` — Next.js app. The Paystack webhook handler lives at
+   `app/api/webhooks/paystack/route.ts`:
+   - Verifies the `x-paystack-signature` header (HMAC-SHA512 over the raw
+     body, using `PAYSTACK_SECRET_KEY` — the same key used for API calls,
+     no separate webhook secret)
+   - Looks up the order from `virtual_accounts.provider_reference`
+     (matched against Paystack's `reference`, echoed back exactly as sent)
+   - Marks the order `paid` (idempotent — safe if Paystack retries the event)
    - Course orders: generates a one-time-use Telegram invite link
      (`member_limit: 1`, so it can't be shared) and records it in
      `channel_access` with its expiry
@@ -62,15 +64,13 @@ and `order.ts`):
 
 ```
 cd web
-cp .env.example .env   # DATABASE_URL, FLUTTERWAVE_SECRET_KEY, FLUTTERWAVE_SECRET_HASH, BOT_TOKEN
+cp .env.example .env   # DATABASE_URL, PAYSTACK_SECRET_KEY, BOT_TOKEN
 npm install
 npm run dev
 ```
 
-Set your Flutterwave dashboard's webhook URL to
-`https://<your-subdomain>/api/webhooks/flutterwave` once deployed, and set
-a Secret Hash under the same webhook settings — that value goes in
-`FLUTTERWAVE_SECRET_HASH`.
+Set your Paystack dashboard's webhook URL (Settings → API Keys & Webhooks)
+to `https://<your-subdomain>/api/webhooks/paystack` once deployed.
 
 4. **Daily expiry cron** — `app/api/cron/expire-access/route.ts`. Sweeps
    `channel_access` for anything `active` whose `expires_at` has passed,
@@ -102,11 +102,11 @@ a Secret Hash under the same webhook settings — that value goes in
    straight to the course's payment screen instead of the generic menu.
 
    Set `BOT_USERNAME` in `web/.env` to your bot's username, without the
-   `@` (e.g. `TelegramAcademyBot`).
+   `@` (e.g. `abeekeyacademybot`).
 
 6. **Unpaid-order expiry cron** — `app/api/cron/expire-orders/route.ts`.
    Separate from the daily channel-access sweep: orders left `pending` for
-   more than 65 minutes (past Flutterwave's ~1hr virtual account window)
+   more than 65 minutes (past Paystack's ~1hr virtual account window)
    get marked `expired`, and the user gets a message + a one-tap "Start a
    new order" button for the same course. Run this one every 10-15
    minutes (not once daily — a stale order going unnoticed for a full day
@@ -121,74 +121,56 @@ a Secret Hash under the same webhook settings — that value goes in
 Still to build: none — Phase 1 and the admin dashboard are both in place.
 Phase 3 (custom 1-on-1 scheduling) is next when subscribers start asking for it.
 
-6. **Admin dashboard** — `app/admin/`. Protected by HTTP Basic Auth
-   (`middleware.ts`, checked against `ADMIN_USERNAME` / `ADMIN_PASSWORD` in
-   `web/.env` — change these before deploying anywhere public).
+6. **Admin dashboard** — `app/admin/`. Protected by a login form at
+   `/admin/login` (`middleware.ts` + `lib/adminSession.ts`) — checked
+   against `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `web/.env`, then a
+   signed, httpOnly session cookie (7-day expiry) is set so you're not
+   re-prompted on every visit. Set `ADMIN_SESSION_SECRET` in `web/.env`
+   too (any long random string) — it signs that cookie; without it the
+   app falls back to signing with `ADMIN_PASSWORD`, which works but means
+   rotating the password also logs everyone out. Change `ADMIN_USERNAME`
+   / `ADMIN_PASSWORD` before deploying anywhere public. "Log out" on the
+   dashboard clears the cookie.
 
    - `/admin` — every course with active-subscriber count and total
-     revenue, publish/unpublish toggle, link to edit
+     revenue, publish/unpublish toggle, delete, link to edit
    - `/admin/courses/new` — create a course (new courses start as a draft;
      publish it from the dashboard once it's ready)
    - `/admin/courses/[id]` — edit course details, and add/remove lessons
      (title + optional file links — the videos themselves still live in
      the Telegram channel, this is just the metadata shown to admins)
 
-   Visit `http://localhost:3000/admin` — your browser will prompt for the
-   username/password.
+   Visit `http://localhost:3000/admin` — you'll be redirected to
+   `/admin/login` the first time.
 
-## Payment providers
+## Payment provider
 
-Which provider is active is a single switch: `PAYMENT_PROVIDER` in
-`bot/.env` (`flutterwave`, `korapay`, or `paystack` — defaults to
-`flutterwave` if unset, but `.env.example` ships with `paystack` as the
-suggested default). Everything else in the bot calls `services/payment.ts`,
-which dispatches to whichever one is active — no other code needs to
-change to switch.
+Paystack is the only payment provider — `services/paystack.ts` (bot side)
+and `app/api/webhooks/paystack/route.ts` (web side). Earlier builds also
+supported Flutterwave and Korapay behind a provider switch; both were
+removed (Flutterwave kept rejecting live charges over an account
+compliance issue unrelated to the code, and running three providers was
+more to maintain than it was worth once Paystack worked reliably).
 
-- **Paystack** (`services/paystack.ts`) — uses Paystack's **Charge API**
-  with the `bank_transfer` channel (`POST /charge`), which generates a
-  dynamic, single-use virtual account per transaction locked to the exact
-  order amount with a ~1hr expiry (`account_expires_at`). This is
-  deliberately *not* Paystack's separate "Dedicated Virtual Account"
-  product — DVAs are permanent, assigned once per customer forever, and
-  need their own activation on top of a verified business. Pay-with-Transfer
-  via the Charge API needs no extra activation beyond a normal Paystack
-  business account, which is why we picked it. Amounts are in **kobo**
-  (naira × 100) — unlike Flutterwave and Korapay, which both take naira
-  directly. Requires `PAYSTACK_SECRET_KEY` in both `bot/.env` and
-  `web/.env`.
-- **Flutterwave** (`services/flutterwave.ts`) — dynamic virtual accounts,
-  locked to both an exact amount and a ~1hr expiry window. We hit
-  persistent "Invalid amount" rejections in live mode traced back to a
-  pending compliance/verification item on the account (not a code issue) —
-  worth confirming that's fully cleared before relying on this provider
-  again.
-- **Korapay** (`services/korapay.ts`) — uses Korapay's **Bank Transfer API**
-  (`POST /charges/bank-transfer`), which generates a dynamic, single-use
-  virtual account per transaction (Wema, Sterling, or Providus), with its
-  own real expiry time returned in the response and used directly rather
-  than guessed. This is a different product from Korapay's "Virtual Bank
-  Account" API (permanent, customer-linked accounts) — that one needs a
-  separate activation form; the Bank Transfer API is what your account is
-  actually enabled for. Requires `KORAPAY_SECRET_KEY` in both `bot/.env`
-  and `web/.env`.
+Paystack uses the **Charge API** with the `bank_transfer` channel
+(`POST /charge`), which generates a dynamic, single-use virtual account per
+transaction locked to the exact order amount with a ~1hr expiry
+(`account_expires_at`). This is deliberately *not* Paystack's separate
+"Dedicated Virtual Account" product — DVAs are permanent, assigned once per
+customer forever, and need their own activation on top of a verified
+business. Pay-with-Transfer via the Charge API needs no extra activation
+beyond a normal Paystack business account. Amounts are in **kobo** (naira ×
+100). Requires `PAYSTACK_SECRET_KEY` in both `bot/.env` and `web/.env`.
 
-Order references include the course slug for readability in all three
-providers' dashboards — `order-flutter-basics-7`, not just `order-7`.
-Korapay requires at least 8 characters either way, which this comfortably
-clears.
-
-Set Korapay's webhook URL (in their dashboard) to
-`https://<your-subdomain>/api/webhooks/korapay` — matching is a direct
-lookup on `data.reference`, which Korapay echoes back exactly as sent.
+Order references include the course slug for readability in the Paystack
+dashboard — `order-flutter-basics-7`, not just `order-7`.
 
 Set Paystack's webhook URL (in their dashboard, under Settings → API Keys
 & Webhooks) to `https://<your-subdomain>/api/webhooks/paystack`. Paystack
 signs the raw webhook body with HMAC-SHA512 using your `PAYSTACK_SECRET_KEY`
 (sent in the `x-paystack-signature` header) — the same secret key used for
 API calls, no separate webhook secret. Matching is a direct lookup on
-`data.reference`, which Paystack echoes back exactly as sent, same as the
-other two providers.
+`data.reference`, which Paystack echoes back exactly as sent.
 
 ## Lifetime vs monthly access (per course)
 

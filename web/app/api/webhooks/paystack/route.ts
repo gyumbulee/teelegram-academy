@@ -4,8 +4,8 @@ import { findOrderByReference } from "@/lib/orders";
 import { fulfillPaidOrder } from "@/lib/fulfillOrder";
 
 // Paystack's Charge API (bank_transfer channel) echoes back the exact
-// `reference` we sent when creating the charge, in data.reference — same
-// direct-lookup pattern as Flutterwave's tx_ref and Korapay's reference.
+// `reference` we sent when creating the charge, in data.reference — a
+// direct lookup against virtual_accounts.provider_reference.
 //
 // Signature verification needs the RAW body text (see
 // lib/verifyPaystackSignature.ts), so this reads req.text() first and

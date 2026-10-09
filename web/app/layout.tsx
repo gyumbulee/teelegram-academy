@@ -22,7 +22,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Telegram Academy",
+  title: "Abeekey Academy",
   description:
     "Practical tech and business training, taught in short video lessons and run entirely on Telegram.",
 };

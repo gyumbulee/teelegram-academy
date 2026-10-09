@@ -7,14 +7,15 @@ import {
   findRecentPendingOrder,
   getLatestAccess,
   isAccessActive,
+  getUserLanguage,
 } from "../db/queries.js";
-import { createVirtualAccountForOrder, activeProviderName } from "../services/payment.js";
+import { createVirtualAccountForOrder } from "../services/paystack.js";
+import { t } from "../i18n.js";
 
 // User has tapped "Proceed to payment" for a specific course.
-// This creates the pending order, requests a virtual account from
-// whichever payment provider is active (see services/payment.ts), and
+// This creates the pending order, requests a Paystack virtual account, and
 // sends the account details to the user. Actual payment confirmation
-// happens later, via that provider's webhook — this handler never marks
+// happens later, via Paystack's webhook — this handler never marks
 // an order as paid itself.
 export async function handleConfirmOrder(ctx: Context) {
   const from = ctx.from;
@@ -26,9 +27,11 @@ export async function handleConfirmOrder(ctx: Context) {
     return;
   }
 
+  const lang = await getUserLanguage(from.id);
+
   const course = await getCourseById(courseId);
   if (!course) {
-    await ctx.answerCallbackQuery({ text: "That course isn't available anymore." });
+    await ctx.answerCallbackQuery({ text: t(lang, "course_unavailable") });
     return;
   }
 
@@ -43,10 +46,9 @@ export async function handleConfirmOrder(ctx: Context) {
   if (course.type !== "one_on_one") {
     const access = await getLatestAccess(from.id, course.id);
     if (isAccessActive(access)) {
-      await ctx.reply(
-        `You already have active access to *${course.title}* — no need to pay again. Use "View courses" to get your invite link resent if needed.`,
-        { parse_mode: "Markdown" },
-      );
+      await ctx.reply(t(lang, "already_active_no_pay", { title: course.title }), {
+        parse_mode: "Markdown",
+      });
       return;
     }
   }
@@ -56,19 +58,20 @@ export async function handleConfirmOrder(ctx: Context) {
   const existing = await findRecentPendingOrder(user.id, course.id);
   if (existing) {
     await ctx.reply(
-      `You already have a payment in progress for *${course.title}*:\n\n` +
-        `🏦 *${existing.bank_name}*\n` +
-        `💳 \`${existing.account_number}\`\n\n` +
-        `Pay ₦${existing.amount_ngn} to that account — no need to start a new one.`,
+      t(lang, "order_in_progress", {
+        title: course.title,
+        bank: existing.bank_name,
+        account: existing.account_number,
+        amount: existing.amount_ngn,
+      }),
       { parse_mode: "Markdown" },
     );
     return;
   }
 
   const order = await createOrder(user.id, course);
-  const provider = activeProviderName();
 
-  // Both providers require an email; synthesize a placeholder tied to the
+  // Paystack requires an email; synthesize a placeholder tied to the
   // telegram id since most users won't have one on hand mid-chat.
   const placeholderEmail = `tg${from.id}@users.abeekey.com`;
 
@@ -82,7 +85,7 @@ export async function handleConfirmOrder(ctx: Context) {
 
   await attachVirtualAccount(
     order.id,
-    provider,
+    "paystack",
     account.accountNumber,
     account.bankName,
     account.reference,
@@ -90,16 +93,19 @@ export async function handleConfirmOrder(ctx: Context) {
   );
 
   const minutesLeft = Math.round((account.expiresAt.getTime() - Date.now()) / 60000);
-  const validityNote =
+  const validity =
     minutesLeft >= 60
-      ? `This account is valid for about ${Math.round(minutesLeft / 60)} hour(s).`
-      : `This account is valid for about ${minutesLeft} minutes.`;
+      ? t(lang, "validity_hours", { hours: Math.round(minutesLeft / 60) })
+      : t(lang, "validity_minutes", { minutes: minutesLeft });
 
   await ctx.reply(
-    `To complete your order for *${course.title}*, pay ₦${course.price_ngn} to:\n\n` +
-      `🏦 *${account.bankName}*\n` +
-      `💳 \`${account.accountNumber}\`\n\n` +
-      `${validityNote} You'll get an invite link automatically once payment is confirmed — no need to send a receipt.`,
+    t(lang, "payment_instructions", {
+      title: course.title,
+      price: course.price_ngn,
+      bank: account.bankName,
+      account: account.accountNumber,
+      validity,
+    }),
     { parse_mode: "Markdown" },
   );
 }

@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ADMIN_SESSION_COOKIE, verifySessionCookieValue } from "@/lib/adminSession";
 
-// Simple HTTP Basic Auth in front of /admin — enough for a single-admin
-// tool. If this ever needs multiple admins or finer-grained permissions,
-// swap this for real session-based auth; not worth the complexity yet.
-export function middleware(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-
-  if (auth) {
-    const [, encoded] = auth.split(" ");
-    const [user, pass] = Buffer.from(encoded, "base64").toString().split(":");
-    if (user === process.env.ADMIN_USERNAME && pass === process.env.ADMIN_PASSWORD) {
-      return NextResponse.next();
-    }
+// Gate on a signed session cookie set by /admin/login's form (see
+// lib/adminSession.ts) — a real login page instead of the browser's native
+// HTTP Basic Auth popup. /admin/login itself must stay reachable without a
+// session, or nobody could ever log in.
+export async function middleware(req: NextRequest) {
+  if (req.nextUrl.pathname === "/admin/login") {
+    return NextResponse.next();
   }
 
-  return new NextResponse("Authentication required", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Admin"' },
-  });
+  const cookie = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  if (await verifySessionCookieValue(cookie)) {
+    return NextResponse.next();
+  }
+
+  const loginUrl = new URL("/admin/login", req.url);
+  loginUrl.searchParams.set("next", req.nextUrl.pathname);
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {

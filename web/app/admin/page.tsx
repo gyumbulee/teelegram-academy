@@ -49,9 +49,14 @@ export default async function AdminHome({
     <div className="admin">
       <header className="admin-header">
         <div className="wrap">
-          <h1>Telegram Academy — Admin</h1>
-          <nav>
+          <h1>Abeekey Academy — Admin</h1>
+          <nav style={{ display: "flex", gap: 16, alignItems: "center" }}>
             <a href="/">View site</a>
+            <form action="/admin/logout" method="post" style={{ margin: 0 }}>
+              <button type="submit" className="btn btn-quiet">
+                Log out
+              </button>
+            </form>
           </nav>
         </div>
       </header>
